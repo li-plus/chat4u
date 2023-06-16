@@ -82,7 +82,7 @@ torchrun --nproc_per_node=8 --master_port=23456 train.py \
     --data_path ../train.json \
     --model_max_length 128 \
     --fp16 True \
-    --output_dir ./llama-wechat \
+    --output_dir ../llama-wechat \
     --num_train_epochs 3 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 8 \
@@ -99,8 +99,54 @@ torchrun --nproc_per_node=8 --master_port=23456 train.py \
     --tf32 False
 ```
 
+DeepSpeed zero3 会分片保存权重，需要将它们合并成一个 pytorch checkpoint 文件：
+```sh
+cd llama-wechat
+python3 zero_to_fp32.py . pytorch_model.bin
+```
+
 消费级显卡上可以尝试 [alpaca-lora](https://github.com/tloen/alpaca-lora) 仅微调 lora 权重，可以显著降低显存和训练成本。
 
 ## 模型部署
 
-TODO
+### 前端调试
+
+可以使用 [alpaca-lora](https://github.com/tloen/alpaca-lora) 部署 gradio 前端，供调试使用。如果是全图微调，需要把 peft 相关代码注释掉，仅加载基础模型。
+```sh
+git clone https://github.com/tloen/alpaca-lora.git && cd alpaca-lora
+CUDA_VISIBLE_DEVICES=0 python3 generate.py --base_model ../llama-wechat
+```
+
+![](docs/alpaca-lora-ui.png)
+
+### 微信接入
+
+需要部署一个兼容 OpenAI API 的后端服务，这里基于 [llama4openai-api.py](https://gist.github.com/kinoc/8a042d8c5683725aa8c372274c02ea2f) 简单适配下，启动服务：
+```sh
+CUDA_VISIBLE_DEVICES=0 python3 llama4openai-api.py
+```
+
+测试接口是否可用：
+```sh
+curl http://127.0.0.1:5000/chat/completions -v -H "Content-Type: application/json" -H "Authorization: Bearer $OPENAI_API_KEY" --data '{"model":"llama-wechat","max_tokens":128,"temperature":0.95,"messages":[{"role":"user","content":"你好"}]}'
+```
+
+使用 [wechat-chatgpt](https://github.com/fuergaosi233/wechat-chatgpt) 接入微信：
+```sh
+docker run -it --rm --name wechat-chatgpt \
+    -e API=http://127.0.0.1:5000 \
+    -e OPENAI_API_KEY=$OPENAI_API_KEY \
+    -e MODEL="gpt-3.5-turbo" \
+    -e CHAT_PRIVATE_TRIGGER_KEYWORD="" \
+    -v $(pwd)/data:/app/data/wechat-assistant.memory-card.json \
+    holegots/wechat-chatgpt:latest
+```
+
+运行效果：
+
+| ![](docs/chat1.jpg) | ![](docs/chat2.jpg) |
+|---------------------|---------------------|
+
+"刚接入" 是机器人说的第一句话，对方到最后也没有猜到。
+
+总体来看，用聊天记录训练的机器人必然会有一些常识性错误，但在聊天风格上已经模仿的比较好了。
