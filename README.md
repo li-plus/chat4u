@@ -117,11 +117,13 @@ git clone https://github.com/tloen/alpaca-lora.git && cd alpaca-lora
 CUDA_VISIBLE_DEVICES=0 python3 generate.py --base_model ../llama-wechat
 ```
 
-![](docs/alpaca-lora-ui.png)
+运行效果：
+
+![](docs/alpaca-lora-ui.jpg)
 
 ### 微信接入
 
-需要部署一个兼容 OpenAI API 的后端服务，这里基于 [llama4openai-api.py](https://gist.github.com/kinoc/8a042d8c5683725aa8c372274c02ea2f) 简单适配下，启动服务：
+需要部署一个兼容 OpenAI API 的模型服务，这里基于 [llama4openai-api.py](https://gist.github.com/kinoc/8a042d8c5683725aa8c372274c02ea2f) 简单适配下，见本仓库里的 [llama4openai-api.py](llama4openai-api.py)，启动服务：
 ```sh
 CUDA_VISIBLE_DEVICES=0 python3 llama4openai-api.py
 ```
@@ -131,7 +133,7 @@ CUDA_VISIBLE_DEVICES=0 python3 llama4openai-api.py
 curl http://127.0.0.1:5000/chat/completions -v -H "Content-Type: application/json" -H "Authorization: Bearer $OPENAI_API_KEY" --data '{"model":"llama-wechat","max_tokens":128,"temperature":0.95,"messages":[{"role":"user","content":"你好"}]}'
 ```
 
-使用 [wechat-chatgpt](https://github.com/fuergaosi233/wechat-chatgpt) 接入微信：
+使用 [wechat-chatgpt](https://github.com/fuergaosi233/wechat-chatgpt) 接入微信，API 地址填自己本地的模型服务地址：
 ```sh
 docker run -it --rm --name wechat-chatgpt \
     -e API=http://127.0.0.1:5000 \
